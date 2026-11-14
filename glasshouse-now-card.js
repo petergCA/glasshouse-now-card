@@ -6,7 +6,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.6.0';
+  const VERSION = '1.6.1';
   const TAG = 'glasshouse-now-card';
 
   const TICK_MS = 30000;
@@ -221,7 +221,7 @@
     .item .caret { flex: 0 0 auto; color: var(--gh-text-3); transition: transform var(--gh-ease); }
     .item .caret ha-icon { --mdc-icon-size: 20px; }
     .item.open .caret { transform: rotate(180deg); }
-    .det { flex: 1 0 100%; margin: 8px 0 2px 50px; display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; scrollbar-width: thin; }
+    .det { flex: 1 0 100%; max-width: calc(100% - 50px); margin: 8px 0 2px 50px; display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; scrollbar-width: thin; }
     .det[hidden] { display: none; }
     .det .dg { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; font-size: 11px; font-weight: 650; letter-spacing: .08em;
       text-transform: uppercase; color: var(--gh-text-2); }
@@ -233,7 +233,11 @@
     .det .ds { flex: 0 0 auto; color: var(--gh-text-3); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .det .dm { color: var(--gh-text-3); font-size: 12px; padding: 4px 8px; }
     /* details.actions: sensor_sentinel — per-entity Ping / Ignore / Deactivate, per-group Reload */
+    /* with actions the list uses the item's full width (no icon indent) so the buttons fit beside the names */
+    .det.acts { margin-left: 0; flex-basis: 100%; max-width: 100%; min-width: 0; }
     .det .drow { display: flex; align-items: center; gap: 4px; min-width: 0; }
+    .det .drow > button.dr { min-width: 0; overflow: hidden; }
+    @container gh-now (max-width: 460px) { .det.acts .ds { display: none; } }
     .det .drow > button.dr { flex: 1 1 auto; }
     .det .dacts { flex: 0 0 auto; display: flex; gap: 2px; }
     .det .da { width: 30px; height: 30px; border-radius: 8px; border: 0; background: none; color: var(--gh-text-2); cursor: pointer;
@@ -1732,6 +1736,7 @@
       if (list.length > shown) kids.push(h('div', { class: 'dm', text: `+${list.length - shown} more` }));
       if (!list.length) kids.push(h('div', { class: 'dm', text: 'No details available' }));
       if (ss && row.dmsg) kids.unshift(h('div', { class: 'dmsg', role: 'status', text: row.dmsg }));
+      row.det.classList.toggle('acts', ss);
       row.det.replaceChildren(...kids);
     }
 
