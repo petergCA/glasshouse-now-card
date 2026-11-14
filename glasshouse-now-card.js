@@ -1,12 +1,12 @@
 /*!
- * Glasshouse Now Card v1.1.1
+ * Glasshouse Now Card v1.2.0
  * What matters in the home right now: what needs you, what is running, and what just happened.
  * Part of the Glasshouse card suite. MIT License (c) 2026 Peter Gray.
  */
 (() => {
   'use strict';
 
-  const VERSION = '1.1.1';
+  const VERSION = '1.2.0';
   const TAG = 'glasshouse-now-card';
 
   const TICK_MS = 30000;
@@ -216,6 +216,22 @@
       box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
       transition: background var(--gh-ease), box-shadow var(--gh-ease), opacity var(--gh-ease);
     }
+    .item.has-det { flex-wrap: wrap; }
+    .item.has-det .main { cursor: pointer; }
+    .item .caret { flex: 0 0 auto; color: var(--gh-text-3); transition: transform var(--gh-ease); }
+    .item .caret ha-icon { --mdc-icon-size: 20px; }
+    .item.open .caret { transform: rotate(180deg); }
+    .det { flex: 1 0 100%; margin: 8px 0 2px 50px; display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; scrollbar-width: thin; }
+    .det[hidden] { display: none; }
+    .det .dg { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; font-size: 11px; font-weight: 650; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--gh-text-2); }
+    .det .dg b { color: var(--sev); font-variant-numeric: tabular-nums; }
+    .det button.dr { display: flex; align-items: baseline; gap: 10px; padding: 5px 8px; border-radius: 8px; text-align: left; color: var(--gh-text);
+      background: none; border: 0; font: inherit; cursor: pointer; min-width: 0; }
+    .det button.dr:hover { background: var(--gh-surface); }
+    .det .dn { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .det .ds { flex: 0 0 auto; color: var(--gh-text-3); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .det .dm { color: var(--gh-text-3); font-size: 12px; padding: 4px 8px; }
     .item.sev-alert { --sev: var(--gh-alert); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gh-alert) 22%, transparent); }
     .item.sev-warn { --sev: var(--gh-warn); }
     .item.sev-info { --sev: var(--gh-info); }
@@ -1565,17 +1581,29 @@
       row.t = h('span', { class: 't' });
       row.m = h('span', { class: 'm' });
       row.main = h('button', { class: 'main', type: 'button' }, [row.chip, h('span', { class: 'txt' }, [row.t, row.m])]);
-      row.main.addEventListener('click', () => { const id = row.item && row.item.entities[0]; if (id) this._moreInfo(id); });
+      row.main.addEventListener('click', () => {
+        if (row.rule && row.rule.details) { row.open = !row.open; this._updateItem(row, row.item); return; }
+        const id = row.item && row.item.entities[0]; if (id) this._moreInfo(id);
+      });
+      row.caret = h('span', { class: 'caret', 'aria-hidden': 'true' });
+      row.caret.innerHTML = '<ha-icon icon="mdi:chevron-down"></ha-icon>';
+      row.det = h('div', { class: 'det', hidden: true });
       row.lb = h('span', { class: 'lb' });
       row.fix = h('button', { class: 'fix', type: 'button' }, [row.lb, h('span', { class: 'sp' }), svg(CHECK_SVG, 'ok')]);
       row.fix.addEventListener('click', (e) => { e.stopPropagation(); this._runFix(row); });
-      row.el = h('div', { class: 'item', role: 'listitem' }, [row.bar, row.main, row.fix]);
+      row.el = h('div', { class: 'item', role: 'listitem' }, [row.bar, row.main, row.caret, row.fix, row.det]);
       row.phase = 'idle';
       return row;
     }
 
     _updateItem(row, it) {
-      row.el.className = `item sev-${it.severity}${row.el.classList.contains('enter') ? ' enter' : ''}`;
+      row.rule = ((this._config && this._config.attention) || []).find((r) => r.key === it.key) || null;
+      const det = row.rule && row.rule.details;
+      row.el.className = `item sev-${it.severity}${row.el.classList.contains('enter') ? ' enter' : ''}${det ? ' has-det' : ''}${det && row.open ? ' open' : ''}`;
+      row.caret.hidden = !det;
+      row.main.setAttribute('aria-expanded', det ? String(!!row.open) : 'false');
+      row.det.hidden = !(det && row.open);
+      if (det && row.open) this._renderDetails(row, it, det);
       row.el.dataset.key = it.key;
       setIcon(row.chip, it.icon, this._hass);
       setText(row.t, it.title);
@@ -1589,6 +1617,49 @@
         row.fix.setAttribute('aria-busy', row.phase === 'busy' ? 'true' : 'false');
         ['busy', 'done', 'error', 'confirm'].forEach((p) => setCls(row.fix, p, row.phase === p));
       }
+    }
+
+    /** details: { attribute, name_key, sub_keys, group_by, max } — list rows from a list attribute of the rule's entity */
+    _renderDetails(row, it, det) {
+      const d = typeof det === 'object' ? det : {};
+      const st = this._hass && this._hass.states[it.entities[0]];
+      const raw = st && st.attributes ? st.attributes[d.attribute || 'entities'] : null;
+      const list = Array.isArray(raw) ? raw.filter((x) => x && typeof x === 'object') : [];
+      const nameKey = d.name_key || 'name';
+      const subKeys = toList(d.sub_keys || ['area', 'since']);
+      const max = Number(d.max) > 0 ? Number(d.max) : 15;
+      const now = this._now();
+      const fmtSub = (x) => subKeys.map((k) => {
+        const v = x[k];
+        if (v == null || v === '') return '';
+        if (/since|changed|time|at$/i.test(k) && !Number.isNaN(Date.parse(v))) return fmtRelative(Date.parse(v), now);
+        return String(v);
+      }).filter(Boolean).join(' · ');
+      const groups = new Map();
+      for (const x of list) {
+        const g = d.group_by ? String(x[d.group_by] || 'other') : '';
+        if (!groups.has(g)) groups.set(g, []);
+        groups.get(g).push(x);
+      }
+      const sig = JSON.stringify([list.length, list.slice(0, max).map((x) => [x[nameKey], x.entity_id, fmtSub(x)])]);
+      if (sig === row.detSig) return;
+      row.detSig = sig;
+      const kids = [];
+      let shown = 0;
+      const sorted = [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
+      for (const [g, xs] of sorted) {
+        if (g) kids.push(h('div', { class: 'dg' }, [h('span', { text: g.replace(/_/g, ' ') }), h('b', { text: String(xs.length) })]));
+        for (const x of xs) {
+          if (shown >= max) break;
+          shown++;
+          const b = h('button', { class: 'dr', type: 'button' }, [h('span', { class: 'dn', text: String(x[nameKey] || x.entity_id || '—') }), h('span', { class: 'ds', text: fmtSub(x) })]);
+          if (x.entity_id) b.addEventListener('click', (e) => { e.stopPropagation(); this._moreInfo(x.entity_id); });
+          kids.push(b);
+        }
+      }
+      if (list.length > shown) kids.push(h('div', { class: 'dm', text: `+${list.length - shown} more` }));
+      if (!list.length) kids.push(h('div', { class: 'dm', text: 'No details available' }));
+      row.det.replaceChildren(...kids);
     }
 
     _setPhase(row, phase, ms) {
