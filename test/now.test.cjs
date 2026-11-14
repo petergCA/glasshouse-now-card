@@ -258,6 +258,9 @@ const rule = (r) => H.normRule(r, 0);
     const d = (e) => { const x = H.describeEvent(e, S, null); return `${x.name} ${x.verb}`; };
     eq(d({ entity_id: 'binary_sensor.fd', state: 'on' }), 'Front Door opened', 'door opened');
     eq(d({ entity_id: 'cover.g', state: 'closed' }), 'Garage closed', 'garage closed');
+    const tone = (e) => H.describeEvent(e, S, null).tone;
+    eq([tone({ entity_id: 'cover.g', state: 'closed' }), tone({ entity_id: 'cover.g', state: 'open' }), tone({ entity_id: 'binary_sensor.fd', state: 'off' }), tone({ entity_id: 'binary_sensor.fd', state: 'on' })],
+      ['ok', 'warn', 'ok', 'warn'], 'doors and garages: closed green, open yellow (like locks)');
     eq(d({ entity_id: 'person.a', state: 'home' }), 'Alex arrived home', 'arrived home');
     eq(d({ entity_id: 'person.a', state: 'not_home' }), 'Alex left home', 'left home');
     eq(d({ entity_id: 'lock.x', state: 'unlocked' }), 'X unlocked', 'unknown entity falls back to its id');

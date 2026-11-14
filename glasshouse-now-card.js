@@ -1,12 +1,12 @@
 /*!
- * Glasshouse Now Card v1.4.0
+ * Glasshouse Now Card v1.4.1
  * What matters in the home right now: what needs you, what is running, and what just happened.
  * Part of the Glasshouse card suite. MIT License (c) 2026 Peter Gray.
  */
 (() => {
   'use strict';
 
-  const VERSION = '1.4.0';
+  const VERSION = '1.4.1';
   const TAG = 'glasshouse-now-card';
 
   const TICK_MS = 30000;
@@ -1054,7 +1054,10 @@
         window: ['mdi:window-open-variant', 'mdi:window-closed-variant'], shutter: ['mdi:window-shutter-open', 'mdi:window-shutter'],
         opening: ['mdi:square-rounded-outline', 'mdi:square-rounded'],
       }[kind];
-      return out(verb, { icon: open || s === 'opening' ? icons[0] : icons[1] }, open || s === 'opening' ? 'cover' : 'neutral');
+      // doors and garage doors read like locks: closed = secure (green), open = needs a look (yellow)
+      const secure = kind === 'garage' || kind === 'door';
+      const tone = open || s === 'opening' ? (secure ? 'warn' : 'cover') : closed && secure ? 'ok' : 'neutral';
+      return out(verb, { icon: open || s === 'opening' ? icons[0] : icons[1] }, tone);
     }
     if (d === 'binary_sensor') {
       const on = s === 'on';
