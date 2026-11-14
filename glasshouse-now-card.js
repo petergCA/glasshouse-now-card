@@ -6,7 +6,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.6.3';
+  const VERSION = '1.7.0';
   const TAG = 'glasshouse-now-card';
 
   const TICK_MS = 30000;
@@ -262,6 +262,10 @@
     .chip { position: relative; flex: 0 0 auto; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
       color: var(--sev); background: color-mix(in srgb, var(--sev) 15%, transparent);
       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sev) 32%, transparent); }
+    .chip .num { font-size: 18px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+    .chip .num.long { font-size: 13px; }
+    .chip .num.bump { animation: gh-bump .5s cubic-bezier(.2,.8,.2,1); }
+    @keyframes gh-bump { 0% { transform: scale(1.45); opacity: .4; } 100% { transform: scale(1); opacity: 1; } }
     .item.sev-alert .chip { animation: gh-pulse 2.4s ease-in-out infinite; }
     @keyframes gh-pulse { 50% { box-shadow: inset 0 0 0 1px var(--gh-alert), 0 0 22px -4px var(--gh-alert); } }
     .txt { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
@@ -451,8 +455,19 @@
   }
   const CHECK_SVG = '<path d="M5.5 12.5l4.2 4.2L18.5 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>';
 
-  /** Swap an icon into `host` only when it changed. spec: {icon} or {stateObj, hass}. */
+  /** Swap an icon into `host` only when it changed. spec: {icon}, {text} (a live number in place of the icon) or {stateObj, hass}. */
   function setIcon(host, spec, hass) {
+    if (spec.text !== undefined && spec.text !== null) {
+      const t = String(spec.text), key = `t:${t}`;
+      if (host._iconKey === key) return;
+      const was = host._iconKey;
+      host._iconKey = key;
+      const el = document.createElement('span');
+      el.className = `num${t.length > 2 ? ' long' : ''}${was && was.startsWith('t:') ? ' bump' : ''}`;
+      el.textContent = t;
+      host.replaceChildren(el);
+      return;
+    }
     const key = spec.icon ? `i:${spec.icon}` : `s:${spec.stateObj ? `${spec.stateObj.entity_id}|${spec.stateObj.state}` : ''}`;
     if (host._iconKey === key) {
       if (!spec.icon && host.firstChild && hass) host.firstChild.hass = hass;
@@ -781,7 +796,7 @@
     const durMin = (now - oldest) / 60000;
     const vars = {
       duration: fmtDuration(durMin), state: humanState(first.st), name, count: firing.length,
-      names: joinNames(names), value: humanState(first.st),
+      names: joinNames(names), value: humanState(first.st), raw: first.st ? String(first.st.state) : '',
     };
     let msgT = rule.message;
     if (msgT === undefined || msgT === null) {
@@ -790,7 +805,9 @@
     const fix = fixCalls(rule.fix, firing.map((f) => f.id), states);
     return {
       key: rule.key, severity: rule.severity, title: name, message: cap(template(msgT, vars)),
-      icon: defaultRuleIcon(first.st, rule), since: oldest, entities: firing.map((f) => f.id), fix,
+      // icon_text: show a live value (e.g. "{raw}") in the chip instead of an icon
+      icon: rule.icon_text ? { text: template(String(rule.icon_text), vars) } : defaultRuleIcon(first.st, rule),
+      since: oldest, entities: firing.map((f) => f.id), fix,
     };
   }
 

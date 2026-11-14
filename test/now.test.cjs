@@ -117,6 +117,8 @@ const rule = (r) => H.normRule(r, 0);
       eq(out.length, 0, 'last_changed-based `for` waits after the count moves');
       out = H.evalAttention([rule({ entity: 'sensor.sentinel', above: 0, for: 15, since_attribute: 'longest_down.since' })], states(cnt), NOW);
       eq(out.length, 1, 'since_attribute fires from the attribute timestamp');
+      out = H.evalAttention([rule({ entity: 'sensor.sentinel', above: 0, icon_text: '{raw}' })], states(cnt), NOW);
+      eq(out[0].icon, { text: '5' }, 'icon_text puts the live count in the chip');
     }
     out = H.evalAttention([rule({ entity: 'lock.gate', when: ['unlocked', 'jammed'] })], states(st('lock.gate', 'jammed')), NOW);
     eq(out.length, 1, 'when accepts a list');
