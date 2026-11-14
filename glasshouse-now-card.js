@@ -6,7 +6,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.6.1';
+  const VERSION = '1.6.2';
   const TAG = 'glasshouse-now-card';
 
   const TICK_MS = 30000;
@@ -727,6 +727,7 @@
       const dc = a.device_class;
       const open = s === 'on' || s === 'open' || s === 'opening';
       if (dc === 'garage_door' || dc === 'garage') return { icon: open ? 'mdi:garage-open-variant' : 'mdi:garage-variant' };
+      if (dc === 'gate' || (['opening', 'door'].includes(dc) && /gate/i.test(`${st.entity_id} ${a.friendly_name || ''}`))) return { icon: open ? 'mdi:gate-open' : 'mdi:gate' };
       if (dc === 'door') return { icon: open ? 'mdi:door-open' : 'mdi:door-closed' };
       if (dc === 'window') return { icon: open ? 'mdi:window-open-variant' : 'mdi:window-closed-variant' };
       if (dc === 'moisture') return { icon: 'mdi:water-alert' };
@@ -1076,18 +1077,20 @@
       if (s === 'jammed') return out('jammed', { icon: 'mdi:lock-alert' }, 'alert');
       if (s === 'open') return out('opened', { icon: 'mdi:lock-open-variant' }, 'warn');
     }
-    if (d === 'cover' || (d === 'binary_sensor' && ['door', 'garage_door', 'window', 'opening'].includes(dc))) {
+    if (d === 'cover' || (d === 'binary_sensor' && ['door', 'garage_door', 'window', 'opening', 'gate'].includes(dc))) {
       const open = s === 'on' || s === 'open';
       const closed = s === 'off' || s === 'closed';
       const verb = open ? 'opened' : closed ? 'closed' : s === 'opening' ? 'opening' : s === 'closing' ? 'closing' : humanState({ ...st, entity_id: id, state: ev.state });
-      const kind = dc === 'garage_door' || dc === 'garage' ? 'garage' : dc === 'door' ? 'door' : dc === 'window' ? 'window' : d === 'cover' ? 'shutter' : 'opening';
+      // a gate (device_class gate, or an "opening" / door named like one) reads like a door
+      const isGate = dc === 'gate' || (['opening', 'door'].includes(dc) && /gate/i.test(`${id} ${name}`));
+      const kind = isGate ? 'gate' : dc === 'garage_door' || dc === 'garage' ? 'garage' : dc === 'door' ? 'door' : dc === 'window' ? 'window' : d === 'cover' ? 'shutter' : 'opening';
       const icons = {
-        garage: ['mdi:garage-open-variant', 'mdi:garage-variant'], door: ['mdi:door-open', 'mdi:door-closed'],
+        garage: ['mdi:garage-open-variant', 'mdi:garage-variant'], door: ['mdi:door-open', 'mdi:door-closed'], gate: ['mdi:gate-open', 'mdi:gate'],
         window: ['mdi:window-open-variant', 'mdi:window-closed-variant'], shutter: ['mdi:window-shutter-open', 'mdi:window-shutter'],
         opening: ['mdi:square-rounded-outline', 'mdi:square-rounded'],
       }[kind];
       // doors and garage doors read like locks: closed = secure (green), open = needs a look (yellow)
-      const secure = kind === 'garage' || kind === 'door';
+      const secure = kind === 'garage' || kind === 'door' || kind === 'gate';
       const tone = open || s === 'opening' ? (secure ? 'warn' : 'cover') : closed && secure ? 'ok' : 'neutral';
       return out(verb, { icon: open || s === 'opening' ? icons[0] : icons[1] }, tone);
     }

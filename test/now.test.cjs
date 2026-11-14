@@ -263,6 +263,8 @@ const rule = (r) => H.normRule(r, 0);
     const S = states(
       st('binary_sensor.fd', 'off', { device_class: 'door', friendly_name: 'Front Door' }),
       st('person.a', 'home', { friendly_name: 'Alex' }), st('cover.g', 'closed', { device_class: 'garage', friendly_name: 'Garage' }),
+      st('binary_sensor.contact_back_gate', 'off', { device_class: 'opening', friendly_name: 'Back Gate' }),
+      st('binary_sensor.shed', 'off', { device_class: 'opening', friendly_name: 'Shed' }),
     );
     const d = (e) => { const x = H.describeEvent(e, S, null); return `${x.name} ${x.verb}`; };
     eq(d({ entity_id: 'binary_sensor.fd', state: 'on' }), 'Front Door opened', 'door opened');
@@ -270,6 +272,9 @@ const rule = (r) => H.normRule(r, 0);
     const tone = (e) => H.describeEvent(e, S, null).tone;
     eq([tone({ entity_id: 'cover.g', state: 'closed' }), tone({ entity_id: 'cover.g', state: 'open' }), tone({ entity_id: 'binary_sensor.fd', state: 'off' }), tone({ entity_id: 'binary_sensor.fd', state: 'on' })],
       ['ok', 'warn', 'ok', 'warn'], 'doors and garages: closed green, open yellow (like locks)');
+    eq([tone({ entity_id: 'binary_sensor.contact_back_gate', state: 'on' }), tone({ entity_id: 'binary_sensor.contact_back_gate', state: 'off' })], ['warn', 'ok'], 'a gate reads like a door');
+    eq(H.describeEvent({ entity_id: 'binary_sensor.contact_back_gate', state: 'on' }, S, null).icon, { icon: 'mdi:gate-open' }, 'gate icon');
+    eq(tone({ entity_id: 'binary_sensor.shed', state: 'off' }), 'neutral', 'other openings stay neutral');
     eq(d({ entity_id: 'person.a', state: 'home' }), 'Alex arrived home', 'arrived home');
     eq(d({ entity_id: 'person.a', state: 'not_home' }), 'Alex left home', 'left home');
     eq(d({ entity_id: 'lock.x', state: 'unlocked' }), 'X unlocked', 'unknown entity falls back to its id');
