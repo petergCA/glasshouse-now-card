@@ -109,6 +109,15 @@ const rule = (r) => H.normRule(r, 0);
 
     out = H.evalAttention([rule({ entity: 'lock.gate', when: 'unlocked', for: 30 })], states(st('lock.gate', 'unlocked', {}, 10)), NOW);
     eq(out.length, 0, 'does not fire before `for` minutes');
+    {
+      // count changed 2 min ago, but the oldest problem is 18 h old: since_attribute times `for` from it
+      const since = new Date(NOW - 18 * 3600e3).toISOString();
+      const cnt = st('sensor.sentinel', '5', { longest_down: { since } }, 2);
+      out = H.evalAttention([rule({ entity: 'sensor.sentinel', above: 0, for: 15 })], states(cnt), NOW);
+      eq(out.length, 0, 'last_changed-based `for` waits after the count moves');
+      out = H.evalAttention([rule({ entity: 'sensor.sentinel', above: 0, for: 15, since_attribute: 'longest_down.since' })], states(cnt), NOW);
+      eq(out.length, 1, 'since_attribute fires from the attribute timestamp');
+    }
     out = H.evalAttention([rule({ entity: 'lock.gate', when: ['unlocked', 'jammed'] })], states(st('lock.gate', 'jammed')), NOW);
     eq(out.length, 1, 'when accepts a list');
     out = H.evalAttention([rule({ entity: 'lock.gate', when: 'unlocked' })], states(st('lock.gate', 'locked')), NOW);

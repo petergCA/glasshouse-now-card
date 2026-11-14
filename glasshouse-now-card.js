@@ -1,12 +1,12 @@
 /*!
- * Glasshouse Now Card v1.4.2
+ * Glasshouse Now Card v1.5.0
  * What matters in the home right now: what needs you, what is running, and what just happened.
  * Part of the Glasshouse card suite. MIT License (c) 2026 Peter Gray.
  */
 (() => {
   'use strict';
 
-  const VERSION = '1.4.2';
+  const VERSION = '1.5.0';
   const TAG = 'glasshouse-now-card';
 
   const TICK_MS = 30000;
@@ -658,6 +658,9 @@
     }
     const f = parseDuration(r.for);
     out.forMin = Number.isFinite(f) ? Math.max(0, f) : 0;
+    // since_attribute: time `for` from a timestamp attribute (dot path, e.g. "longest_down.since") instead of
+    // last_changed — for count sensors whose value moves while the underlying problem persists
+    out.sinceAttr = typeof r.since_attribute === 'string' && r.since_attribute ? r.since_attribute.split('.') : null;
     out.conditions = toList(r.condition || r.conditions).filter((c) => c && typeof c === 'object' && c.entity);
     return out;
   }
@@ -729,12 +732,20 @@
     return rule.conditions.every((c) => stateMatches(states[c.entity], c));
   }
 
+  function attrSince(st, path) {
+    let v = st && st.attributes;
+    for (const k of path) v = v && typeof v === 'object' ? v[k] : undefined;
+    const t = typeof v === 'string' || typeof v === 'number' ? parseTime(v) : NaN;
+    return Number.isFinite(t) ? t : NaN;
+  }
+
   function evalEntityRule(rule, states, now) {
     const firing = [];
     for (const id of rule.entities) {
       const st = states[id];
       if (!st || !stateMatches(st, rule)) continue;
-      const since = sinceOf(st);
+      const a = rule.sinceAttr ? attrSince(st, rule.sinceAttr) : NaN;
+      const since = Number.isFinite(a) ? a : sinceOf(st);
       const held = Number.isFinite(since) ? (now - since) / 60000 : NaN;
       if (rule.forMin > 0 && !(held >= rule.forMin)) continue;
       firing.push({ id, st, since });

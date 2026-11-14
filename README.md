@@ -78,6 +78,7 @@ An entity rule fires while its test is true:
 | `not` | string or list | – | State is anything except these (unavailable/unknown never match). |
 | `above` / `below` | number | – | Numeric tests (can be combined). |
 | `for` | minutes | `0` | How long the test must have held (from `last_changed`). Also accepts `"1:30"` or `"90 min"`. |
+| `since_attribute` | string | – | Time `for` from this timestamp attribute instead of `last_changed` (dot path, e.g. `longest_down.since`). For count sensors whose value changes while the problem persists. |
 | `condition` | object or list | – | Extra gate(s): `{entity, state / when / not / above / below}`. All must hold. |
 | `name` | string | friendly name | Title of the item. |
 | `message` | string | `{state} for {duration}` | Second line. Templates below. |
