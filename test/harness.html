@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glasshouse Now Card harness</title>
+<!--
+  Offline test harness. Open directly (file://) in a browser.
+  ?scenario=busy|calm  everything firing (default) or the calm empty state
+  ?w=390               render one card at this width (phone); default shows phone + desktop side by side
+  ?preview             the composition used for docs/preview.png
+  ?t=HH:MM             freeze the clock (default 20:47) so screenshots are deterministic
+  ?live                stream a new activity event and run a fix after load (to see the motion)
+  Stubs for ha-card / ha-icon / ha-state-icon and a mock hass (mock-hass.js) stand in for Home Assistant.
+-->
+<style>
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    color: #e9eef6;
+    font-family: -apple-system, "SF Pro Text", Inter, Roboto, system-ui, sans-serif;
+    background:
+      radial-gradient(1200px 700px at 12% -10%, rgba(88,166,255,0.16), transparent 60%),
+      radial-gradient(900px 600px at 95% 5%, rgba(196,140,255,0.12), transparent 60%),
+      radial-gradient(1000px 800px at 50% 120%, rgba(77,214,232,0.08), transparent 60%),
+      linear-gradient(180deg, #070b13 0%, #0a1020 55%, #070b13 100%) fixed;
+  }
+  .page { display: flex; gap: 28px; padding: 20px; align-items: flex-start; }
+  .phone { flex: 0 0 390px; width: 390px; display: flex; flex-direction: column; gap: 12px;
+    padding: 8px; box-sizing: border-box; border-right: 1px dashed rgba(255,255,255,0.08); }
+  .wide { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  .single { padding: 16px; box-sizing: border-box; }
+  h6 { margin: 4px 0 0; font: 600 11px/1 system-ui; letter-spacing: .09em; text-transform: uppercase; color: #5d697d; }
+  #log { font: 11px/1.4 ui-monospace, monospace; color: #5d697d; white-space: pre-wrap; padding: 0 20px; }
+  body.preview .page { padding: 32px; }
+</style>
+<script>
+  /* Freeze the clock to a fixed evening time so screenshots are deterministic (?t=HH:MM). */
+  (() => {
+    const q = new URLSearchParams(location.search);
+    const [hh, mm] = (q.get('t') || '20:47').split(':').map(Number);
+    const base = new Date();
+    base.setHours(hh, mm, 0, 0);
+    const offset = base.getTime() - Date.now();
+    const RealDate = Date;
+    class FakeDate extends RealDate {
+      constructor(...a) { if (a.length) super(...a); else super(RealDate.now() + offset); }
+      static now() { return RealDate.now() + offset; }
+    }
+    window.Date = FakeDate;
+  })();
+</script>
+<script src="icons.js" onerror="window.GH_TEST_ICONS = {}"></script>
+<script>
+  // ---- minimal Home Assistant element stubs ----
+  customElements.define('ha-card', class extends HTMLElement {});
+
+  function svgFor(name) {
+    const d = (window.GH_TEST_ICONS || {})[name];
+    if (!d) {
+      const label = String(name || '?').replace('mdi:', '').slice(0, 2).toUpperCase();
+      return `<span style="font:700 9px system-ui;letter-spacing:-.02em">${label}</span>`;
+    }
+    return `<svg viewBox="0 0 24 24" width="100%" height="100%" style="display:block;fill:currentColor"><path d="${d}"></path></svg>`;
+  }
+
+  class StubIcon extends HTMLElement {
+    static get observedAttributes() { return ['icon']; }
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' }).innerHTML =
+        '<style>:host{display:inline-flex;width:var(--mdc-icon-size,24px);height:var(--mdc-icon-size,24px);align-items:center;justify-content:center;vertical-align:middle}</style><span style="display:contents"></span>';
+    }
+    set icon(v) { this._icon = v; this._render(); }
+    get icon() { return this._icon; }
+    attributeChangedCallback(n, o, v) { this._icon = v; this._render(); }
+    _render() { this.shadowRoot.querySelector('span').innerHTML = svgFor(this._icon); }
+  }
+  customElements.define('ha-icon', StubIcon);
+
+  function stateIcon(st) {
+    if (!st) return 'mdi:alert-circle-outline';
+    const d = st.entity_id.split('.')[0], on = st.state === 'on';
+    switch (d) {
+      case 'light': return on ? 'mdi:lightbulb' : 'mdi:lightbulb-outline';
+      case 'switch': return on ? 'mdi:toggle-switch-variant' : 'mdi:toggle-switch-variant-off';
+      case 'timer': return 'mdi:timer-outline';
+      case 'person': return 'mdi:account';
+      case 'lock': return st.state === 'locked' ? 'mdi:lock' : 'mdi:lock-open-variant';
+      case 'cover': return st.state === 'closed' ? 'mdi:garage-variant' : 'mdi:garage-open-variant';
+      case 'sensor': return 'mdi:progress-clock';
+      default: return 'mdi:home-outline';
+    }
+  }
+  customElements.define('ha-state-icon', class extends StubIcon {
+    set stateObj(st) { this._st = st; this._icon = stateIcon(st); this._render(); }
+    get stateObj() { return this._st; }
+    set hass(h) { this._hass = h; }
+  });
+</script>
+<script src="mock-hass.js"></script>
+<script src="../glasshouse-now-card.js"></script>
+</head>
+<body>
+<div class="page" id="page"></div>
+<pre id="log"></pre>
+<script>
+(function () {
+  const q = new URLSearchParams(location.search);
+  const preview = q.has('preview');
+  const scenario = q.get('scenario') || 'busy';
+  if (preview) document.body.classList.add('preview');
+  const mock = GHNowMock.createHass({ scenario });
+  window.mock = mock;
+  const config = GHNowMock.demoConfig();
+
+  const cards = [];
+  function add(parent, label, width) {
+    const box = document.createElement('div');
+    box.style.cssText = `display:flex;flex-direction:column;gap:8px;min-width:0;${width ? `width:${width}px;` : ''}`;
+    if (label) { const l = document.createElement('h6'); l.textContent = label; box.append(l); }
+    const el = document.createElement('glasshouse-now-card');
+    el.setConfig(config);
+    box.append(el);
+    parent.append(box);
+    cards.push(el);
+    return el;
+  }
+
+  const page = document.getElementById('page');
+  if (q.has('w')) {
+    page.className = 'single';
+    page.style.width = `${Number(q.get('w'))}px`;
+    add(page);
+  } else if (preview) {
+    add(page, null, Number(q.get('pw') || 1180));
+  } else {
+    const phone = document.createElement('div'); phone.className = 'phone'; page.append(phone);
+    const wide = document.createElement('div'); wide.className = 'wide'; page.append(wide);
+    add(phone, `phone · ${scenario}`);
+    add(wide, `desktop · ${scenario}`);
+  }
+
+  mock.subscribe((hass) => cards.forEach((el) => { el.hass = hass; }));
+
+  const log = document.getElementById('log');
+  if (preview || q.has('w')) log.remove();
+  else {
+    document.addEventListener('hass-more-info', (e) => { log.textContent += `more-info ${e.detail.entityId}\n`; });
+    setInterval(() => {
+      log.textContent = mock.calls.slice(-8).map((c) => `${c.domain}.${c.service} ${JSON.stringify(c.data)}`).join('\n');
+    }, 500);
+  }
+
+  if (q.has('live')) {
+    setTimeout(() => mock.setState('binary_sensor.front_door', 'on'), 900);
+    setTimeout(() => {
+      const btn = cards[0].shadowRoot.querySelector('.item .fix:not([hidden])');
+      if (btn) btn.click();
+    }, 1200);
+  }
+})();
+</script>
+</body>
+</html>
