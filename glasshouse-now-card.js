@@ -1,12 +1,12 @@
 /*!
- * Glasshouse Now Card v1.1.0
+ * Glasshouse Now Card v1.1.1
  * What matters in the home right now: what needs you, what is running, and what just happened.
  * Part of the Glasshouse card suite. MIT License (c) 2026 Peter Gray.
  */
 (() => {
   'use strict';
 
-  const VERSION = '1.1.0';
+  const VERSION = '1.1.1';
   const TAG = 'glasshouse-now-card';
 
   const TICK_MS = 30000;
@@ -172,6 +172,7 @@
     .main-col { container: gh-main / inline-size; }
     @container gh-main (min-width: 620px) {
       .list.run-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .list.run-list > :last-child:nth-child(odd) { grid-column: 1 / -1; }
     }
     .col:empty, .col.empty { display: none; }
     @container gh-now (min-width: 700px) {
