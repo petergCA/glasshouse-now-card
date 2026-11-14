@@ -147,8 +147,9 @@ remains.
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `entities` | list | **required** | Entity ids, or objects `{entity, name, icon, states: [...]}`; `states` limits which changes are shown. |
-| `max` | number | `8` | Events shown. |
+| `max` | number | `8` (`100` with `visible`) | Most events kept. |
 | `hours` | number | `12` | How far back to look. |
+| `visible` | number | – | Rows visible at once. The feed keeps that height and scrolls through every event in `hours` (fading at the bottom while more is below). Ignored in the wide split layout, which already fills its column and scrolls. |
 
 Changes to `unavailable` / `unknown` are skipped. Doors, windows, garage doors and covers read as
 opened/closed; locks as locked/unlocked; people as arrived home / left home / arrived at a zone; motion,

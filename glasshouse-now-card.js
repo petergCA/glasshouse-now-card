@@ -1,12 +1,12 @@
 /*!
- * Glasshouse Now Card v1.2.0
+ * Glasshouse Now Card v1.3.0
  * What matters in the home right now: what needs you, what is running, and what just happened.
  * Part of the Glasshouse card suite. MIT License (c) 2026 Peter Gray.
  */
 (() => {
   'use strict';
 
-  const VERSION = '1.2.0';
+  const VERSION = '1.3.0';
   const TAG = 'glasshouse-now-card';
 
   const TICK_MS = 30000;
@@ -345,6 +345,10 @@
 
     /* ---------- activity ---------- */
     .feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+    /* activity.visible: the feed keeps the height of that many rows and scrolls through the rest */
+    .feed.capped { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+    .feed.capped::-webkit-scrollbar { display: none; }
+    .feed.capped.more { -webkit-mask-image: linear-gradient(#000 calc(100% - 26px), transparent); mask-image: linear-gradient(#000 calc(100% - 26px), transparent); }
     .ev { --tone: var(--gh-text-2); position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 4px 0; }
     .ev:not(:last-child)::after { content: ""; position: absolute; left: 14px; top: 36px; bottom: -8px; width: 1px;
       background: linear-gradient(rgba(255,255,255,0.16), rgba(255,255,255,0.07)); }
@@ -997,13 +1001,14 @@
     const ents = toList(src.entities).map((e) => (typeof e === 'string' ? { entity: e } : e))
       .filter((e) => e && typeof e.entity === 'string' && e.entity.includes('.'));
     if (!ents.length) throw new Error(`${TAG}: "activity.entities" needs at least one entity`);
-    const max = isNum(src.max) ? clamp(Math.round(Number(src.max)), 1, 50) : 8;
+    const visible = isNum(src.visible) ? clamp(Math.round(Number(src.visible)), 1, 50) : null;
+    const max = isNum(src.max) ? clamp(Math.round(Number(src.max)), 1, 100) : visible ? 100 : 8;
     const hours = isNum(src.hours) ? clamp(Number(src.hours), 0.25, 168) : 12;
     const byId = {};
     for (const e of ents) {
       byId[e.entity] = { name: e.name, icon: e.icon, states: e.states !== undefined ? toList(e.states).map(norm) : null };
     }
-    return { entities: ents.map((e) => e.entity), byId, max, hours };
+    return { entities: ents.map((e) => e.entity), byId, max, hours, visible };
   }
 
   const TONE_OF_DOMAIN = { light: 'light', switch: 'switch', input_boolean: 'switch', fan: 'fan', media_player: 'media', climate: 'heat', cover: 'cover' };
@@ -1205,7 +1210,7 @@
       if (!c) return 4;
       const a = this._last ? this._last.att.length : 1;
       const r = this._last ? this._last.run.length : 0;
-      const ev = c.activity ? Math.min(c.activity.max, 8) : 0;
+      const ev = c.activity ? Math.min(c.activity.visible || c.activity.max, 8) : 0;
       return 1 + Math.max(1, a) + r * 2 + Math.ceil(ev / 1.5);
     }
 
@@ -1358,6 +1363,7 @@
       const feed = h('ol', { class: 'feed' });
       E.act.list.replaceWith(feed);
       E.act.list = feed;
+      feed.addEventListener('scroll', () => this._capFeedMore(), { passive: true });
       E.quiet = h('div', { class: 'quiet' }, [h('span', { class: 'q-dot' }, [svg('<circle cx="12" cy="12" r="2.4" fill="currentColor"/>')]), h('span')]);
       E.act.sec.append(E.quiet);
 
@@ -1769,6 +1775,32 @@
           : 'Listening…');
       }
       this._reconcile(E.act.list, this._rows.act, evs, () => this._createEvent(), (row, ev) => this._updateEvent(row, ev, now), (ev) => ev.live);
+      this._capFeed();
+    }
+
+    /** activity.visible: size the feed to that many rows (outside the split layout, which fills its column instead). */
+    _capFeed() {
+      const c = this._config.activity;
+      const feed = this._el.act.list;
+      const zoneEl = feed.parentElement;
+      const split = zoneEl && getComputedStyle(zoneEl).position === 'absolute';
+      const rows = [...feed.children].filter((r) => !r.classList.contains('leaving'));
+      if (!c.visible || split || rows.length <= c.visible) {
+        if (feed.classList.contains('capped')) { feed.classList.remove('capped', 'more'); feed.style.maxHeight = ''; }
+        return;
+      }
+      const top = rows[0].getBoundingClientRect().top;
+      const last = rows[c.visible - 1].getBoundingClientRect();
+      const px = Math.round(last.bottom - top);
+      if (px <= 0) return;
+      feed.classList.add('capped');
+      if (feed.style.maxHeight !== `${px}px`) feed.style.maxHeight = `${px}px`;
+      this._capFeedMore();
+    }
+
+    _capFeedMore() {
+      const feed = this._el.act.list;
+      setCls(feed, 'more', feed.classList.contains('capped') && feed.scrollTop + feed.clientHeight < feed.scrollHeight - 2);
     }
 
     _createEvent() {
