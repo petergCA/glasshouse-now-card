@@ -420,6 +420,55 @@ const rule = (r) => H.normRule(r, 0);
     ok(true, 'stub config works with no entities');
   }
 
+  console.log('details actions: sensor_sentinel');
+  {
+    const w = makeWindow();
+    const card = w.document.createElement('glasshouse-now-card');
+    card.setConfig({ attention: [{ id: 'sent', entity: 'sensor.sent', above: 0, name: 'Devices unavailable',
+      details: { attribute: 'entities', group_by: 'integration', actions: 'sensor_sentinel' } }] });
+    w.document.body.append(card);
+    const calls = [];
+    const ago = new Date(Date.now() - 3600e3).toISOString();
+    card.hass = {
+      states: { 'sensor.sent': { entity_id: 'sensor.sent', state: '2', last_changed: ago, attributes: { entities: [
+        { entity_id: 'sensor.a', name: 'Dehumidifier', integration: 'midea_ac_lan', area: 'Garage', since: ago },
+        { entity_id: 'sensor.z', name: 'Door', integration: 'zwave_js', area: 'Hall', since: ago }] } } },
+      user: { name: 'T' }, language: 'en', locale: { language: 'en' },
+      connection: { subscribeMessage: () => Promise.resolve(() => {}) },
+      callService: (d, s, data, target) => { calls.push([d, s, data, target]); return Promise.resolve(); },
+      callWS: (m) => { calls.push(['ws', m.type, m]); return Promise.resolve(); },
+    };
+    await sleep(30);
+    const $ = (sel) => card.shadowRoot.querySelector(sel);
+    const $$ = (sel) => [...card.shadowRoot.querySelectorAll(sel)];
+    $('.item .main').click();
+    await sleep(30);
+    eq($$('.det .drow').length, 2, 'each entity row has actions');
+    const rowOf = (name) => $$('.det .drow').find((r) => r.textContent.includes(name));
+    const act = (name, i) => rowOf(name).querySelectorAll('.da')[i];
+    act('Door', 0).click(); await sleep(10);
+    eq(calls.at(-1).slice(0, 2), ['zwave_js', 'ping'], 'z-wave ping');
+    act('Dehumidifier', 0).click(); await sleep(10);
+    eq(calls.at(-1), ['homeassistant', 'update_entity', {}, { entity_id: 'sensor.a' }], 'other entities are asked to refresh');
+    act('Dehumidifier', 1).click(); await sleep(10);
+    const chips = $$('.det .dsnz button');
+    eq(chips.map((c) => c.textContent), ['1 h', '1 day', '7 days', '14 days', 'Always'], 'ignore presets');
+    chips[3].click(); await sleep(10);
+    eq(calls.at(-1).slice(0, 3), ['sensor_sentinel', 'snooze', { entity_id: 'sensor.a', minutes: 20160 }], 'ignore 14 days snoozes in Sentinel');
+    act('Dehumidifier', 1).click(); await sleep(10);
+    $$('.det .dsnz button')[4].click(); await sleep(10);
+    eq(calls.at(-1).slice(0, 3), ['sensor_sentinel', 'exclude', { entity_id: 'sensor.a' }], 'Always excludes in Sentinel');
+    const n = calls.length;
+    act('Dehumidifier', 2).click(); await sleep(10);
+    eq(calls.length, n, 'deactivate asks first');
+    act('Dehumidifier', 2).click(); await sleep(10);
+    eq(calls.at(-1).slice(0, 2), ['ws', 'config/entity_registry/update'], 'second tap disables the entity');
+    eq(calls.at(-1)[2].disabled_by, 'user', 'disabled by user');
+    $$('.det .dg .da')[0].click(); await sleep(10);
+    eq(calls.at(-1)[1], 'reload_config_entry', 'group reload');
+    ok(!!$('.det .dmsg'), 'feedback message shown');
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 })();

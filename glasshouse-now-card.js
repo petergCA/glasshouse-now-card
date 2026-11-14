@@ -1,12 +1,12 @@
 /*!
- * Glasshouse Now Card v1.5.0
+ * Glasshouse Now Card v1.6.0
  * What matters in the home right now: what needs you, what is running, and what just happened.
  * Part of the Glasshouse card suite. MIT License (c) 2026 Peter Gray.
  */
 (() => {
   'use strict';
 
-  const VERSION = '1.5.0';
+  const VERSION = '1.6.0';
   const TAG = 'glasshouse-now-card';
 
   const TICK_MS = 30000;
@@ -232,6 +232,23 @@
     .det .dn { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .det .ds { flex: 0 0 auto; color: var(--gh-text-3); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .det .dm { color: var(--gh-text-3); font-size: 12px; padding: 4px 8px; }
+    /* details.actions: sensor_sentinel — per-entity Ping / Ignore / Deactivate, per-group Reload */
+    .det .drow { display: flex; align-items: center; gap: 4px; min-width: 0; }
+    .det .drow > button.dr { flex: 1 1 auto; }
+    .det .dacts { flex: 0 0 auto; display: flex; gap: 2px; }
+    .det .da { width: 30px; height: 30px; border-radius: 8px; border: 0; background: none; color: var(--gh-text-2); cursor: pointer;
+      display: inline-grid; place-items: center; padding: 0; }
+    .det .da ha-icon { --mdc-icon-size: 18px; }
+    .det .da:hover { background: var(--gh-surface); color: var(--gh-text); }
+    .det .da.warn { background: color-mix(in srgb, var(--gh-alert) 18%, transparent); color: var(--gh-alert); width: auto; padding: 0 10px; font: inherit; font-size: 12px; font-weight: 650; }
+    .det .dg .da { margin-left: auto; width: auto; height: 24px; padding: 0 8px; font: inherit; font-size: 11px; font-weight: 650; letter-spacing: .06em; display: inline-flex; gap: 4px; align-items: center; }
+    .det .dg .da ha-icon { --mdc-icon-size: 14px; }
+    .det .dsnz { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 8px 8px; }
+    .det .dsnz span { color: var(--gh-text-3); font-size: 12px; align-self: center; margin-right: 2px; }
+    .det .dsnz button { border: 0; border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+      color: var(--gh-text); background: var(--gh-surface); }
+    .det .dsnz button:hover { background: color-mix(in srgb, var(--sev) 22%, var(--gh-surface)); }
+    .det .dmsg { color: var(--gh-text-2); font-size: 12px; padding: 4px 8px; }
     .item.sev-alert { --sev: var(--gh-alert); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gh-alert) 22%, transparent); }
     .item.sev-warn { --sev: var(--gh-warn); }
     .item.sev-info { --sev: var(--gh-info); }
@@ -1666,25 +1683,103 @@
         if (!groups.has(g)) groups.set(g, []);
         groups.get(g).push(x);
       }
-      const sig = JSON.stringify([list.length, list.slice(0, max).map((x) => [x[nameKey], x.entity_id, fmtSub(x)])]);
+      const ss = d.actions === 'sensor_sentinel';
+      const sig = JSON.stringify([list.length, list.slice(0, max).map((x) => [x[nameKey], x.entity_id, fmtSub(x)]), ss && [row.snz, row.cfm, row.dmsg]]);
       if (sig === row.detSig) return;
       row.detSig = sig;
       const kids = [];
       let shown = 0;
       const sorted = [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
       for (const [g, xs] of sorted) {
-        if (g) kids.push(h('div', { class: 'dg' }, [h('span', { text: g.replace(/_/g, ' ') }), h('b', { text: String(xs.length) })]));
+        if (g) {
+          const gh = h('div', { class: 'dg' }, [h('span', { text: g.replace(/_/g, ' ') }), h('b', { text: String(xs.length) })]);
+          if (ss) gh.append(this._detAct(row, 'mdi:reload', 'Reload integration', 'Reload', () => this._ssReload(row, g, xs.map((x) => x.entity_id).filter(Boolean))));
+          kids.push(gh);
+        }
         for (const x of xs) {
           if (shown >= max) break;
           shown++;
           const b = h('button', { class: 'dr', type: 'button' }, [h('span', { class: 'dn', text: String(x[nameKey] || x.entity_id || '—') }), h('span', { class: 'ds', text: fmtSub(x) })]);
           if (x.entity_id) b.addEventListener('click', (e) => { e.stopPropagation(); this._moreInfo(x.entity_id); });
-          kids.push(b);
+          if (!ss || !x.entity_id) { kids.push(b); continue; }
+          const eid = x.entity_id;
+          const nm = String(x[nameKey] || eid);
+          const acts = h('div', { class: 'dacts' });
+          acts.append(this._detAct(row, 'mdi:access-point', x.integration === 'zwave_js' ? 'Ping Z-Wave node' : 'Ping (ask the integration to refresh it)', null,
+            () => this._ssPing(row, eid, nm, x.integration)));
+          acts.append(this._detAct(row, 'mdi:bell-sleep-outline', 'Ignore…', null, () => { row.snz = row.snz === eid ? null : eid; row.cfm = null; this._rerenderDet(row); }));
+          if (row.cfm === eid) {
+            acts.append(this._detAct(row, null, `Deactivate ${nm}`, 'Deactivate?', () => this._ssDisable(row, eid, nm), 'warn'));
+          } else {
+            acts.append(this._detAct(row, 'mdi:cancel', 'Deactivate (disable the entity in Home Assistant)', null, () => {
+              row.cfm = eid; row.snz = null; this._rerenderDet(row);
+              clearTimeout(row.cfmT); row.cfmT = setTimeout(() => { if (row.cfm === eid) { row.cfm = null; this._rerenderDet(row); } }, 4000);
+            }));
+          }
+          kids.push(h('div', { class: 'drow' }, [b, acts]));
+          if (row.snz === eid) {
+            const chips = [['1 h', 60], ['1 day', 1440], ['7 days', 10080], ['14 days', 20160]].map(([l, m]) => {
+              const c = h('button', { type: 'button', text: l });
+              c.addEventListener('click', (e) => { e.stopPropagation(); this._ssSnooze(row, eid, nm, m, l); });
+              return c;
+            });
+            const always = h('button', { type: 'button', text: 'Always' });
+            always.addEventListener('click', (e) => { e.stopPropagation(); this._ssExclude(row, eid, nm); });
+            kids.push(h('div', { class: 'dsnz' }, [h('span', { text: 'Ignore for' }), ...chips, always]));
+          }
         }
       }
       if (list.length > shown) kids.push(h('div', { class: 'dm', text: `+${list.length - shown} more` }));
       if (!list.length) kids.push(h('div', { class: 'dm', text: 'No details available' }));
+      if (ss && row.dmsg) kids.unshift(h('div', { class: 'dmsg', role: 'status', text: row.dmsg }));
       row.det.replaceChildren(...kids);
+    }
+
+    _rerenderDet(row) { row.detSig = null; if (row.item) this._updateItem(row, row.item); }
+
+    _detAct(row, ic, title, label, fn, cls) {
+      const b = h('button', { class: cls ? `da ${cls}` : 'da', type: 'button', title, 'aria-label': title });
+      if (ic) { const i = document.createElement('ha-icon'); i.setAttribute('icon', ic); i.icon = ic; b.append(i); }
+      if (label) b.append(document.createTextNode(label));
+      b.addEventListener('click', (e) => { e.stopPropagation(); this._haptic('light'); fn(); });
+      return b;
+    }
+
+    _detMsg(row, text) {
+      row.dmsg = text; row.snz = null; row.cfm = null;
+      this._rerenderDet(row);
+      clearTimeout(row.dmsgT);
+      row.dmsgT = setTimeout(() => { row.dmsg = null; this._rerenderDet(row); }, 5000);
+    }
+
+    async _ssCall(row, ok, fail, fn) {
+      try { await fn(); this._detMsg(row, ok); } catch (e) { this._warn(e); this._detMsg(row, `${fail}: ${(e && e.message) || e}`); }
+    }
+
+    // Sensor Sentinel's own actions, as in its card: Z-Wave nodes get zwave_js.ping; other entities are asked to refresh
+    _ssPing(row, eid, nm, integ) {
+      return this._ssCall(row, `Pinged ${nm}`, 'Ping failed', () => (integ === 'zwave_js'
+        ? this._hass.callService('zwave_js', 'ping', {}, { entity_id: eid })
+        : this._hass.callService('homeassistant', 'update_entity', {}, { entity_id: eid })));
+    }
+
+    _ssSnooze(row, eid, nm, minutes, label) {
+      return this._ssCall(row, `Ignoring ${nm} for ${label}`, 'Could not ignore', () => this._hass.callService('sensor_sentinel', 'snooze', { entity_id: eid, minutes }));
+    }
+
+    _ssExclude(row, eid, nm) {
+      return this._ssCall(row, `Always ignoring ${nm} (undo in Sensor Sentinel's Configure)`, 'Could not exclude',
+        () => this._hass.callService('sensor_sentinel', 'exclude', { entity_id: eid }));
+    }
+
+    _ssDisable(row, eid, nm) {
+      return this._ssCall(row, `Deactivated ${nm} (re-enable in Settings → Entities)`, 'Could not deactivate (admin needed?)',
+        () => this._hass.callWS({ type: 'config/entity_registry/update', entity_id: eid, disabled_by: 'user' }));
+    }
+
+    _ssReload(row, group, ids) {
+      return this._ssCall(row, `Reloading ${group.replace(/_/g, ' ')}…`, 'Reload failed (admin needed?)',
+        () => this._hass.callService('homeassistant', 'reload_config_entry', {}, { entity_id: ids }));
     }
 
     _setPhase(row, phase, ms) {

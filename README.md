@@ -86,7 +86,7 @@ An entity rule fires while its test is true:
 | `icon` | string | from the entity | Icon. |
 | `fix` | object | – | One-tap fix (below). |
 | `id` | string | – | Stable key, if you reorder rules often. |
-| `details` | object | – | Tap the item to expand a list built from a list attribute of the (first) entity, instead of opening more-info: `{attribute: entities, name_key: name, sub_keys: [area, since], group_by: integration, max: 15}`. Rows open that entity's more-info. Made for Sensor Sentinel's `sensor.*_unavailable_count`. |
+| `details` | object | – | Tap the item to expand a list built from a list attribute of the (first) entity, instead of opening more-info: `{attribute: entities, name_key: name, sub_keys: [area, since], group_by: integration, max: 15}`. Rows open that entity's more-info. Made for Sensor Sentinel's `sensor.*_unavailable_count`; add `actions: sensor_sentinel` for its per-entity **Ping** (Z-Wave `zwave_js.ping`, otherwise `homeassistant.update_entity`), **Ignore** (Sentinel snooze 1 h / 1 day / 7 / 14 days, or **Always** = Sentinel exclude) and **Deactivate** (disables the entity after a confirm tap), plus **Reload** per integration group. |
 
 With no `when` / `not` / `above` / `below`, a rule fires on the domain's "active" state: unlocked locks,
 open covers, `on` binary sensors and switches, playing media players, triggered alarms, climate not off.
