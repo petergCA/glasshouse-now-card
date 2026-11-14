@@ -1,12 +1,12 @@
 /*!
- * Glasshouse Now Card v1.0.0
+ * Glasshouse Now Card v1.1.0
  * What matters in the home right now: what needs you, what is running, and what just happened.
  * Part of the Glasshouse card suite. MIT License (c) 2026 Peter Gray.
  */
 (() => {
   'use strict';
 
-  const VERSION = '1.0.0';
+  const VERSION = '1.1.0';
   const TAG = 'glasshouse-now-card';
 
   const TICK_MS = 30000;
@@ -178,6 +178,12 @@
       .body.split { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 0; }
       .body.split .main-col { padding-right: 22px; }
       .body.split .side-col { padding-left: 22px; border-left: 1px solid var(--gh-border); }
+      /* the left column sets the height; the feed fills it and scrolls instead of leaving blank space */
+      .body.split .side-col { position: relative; min-height: 236px; }
+      .body.split .side-col > .zone { position: absolute; inset: 0 0 0 22px; display: flex; flex-direction: column; }
+      .body.split .side-col .feed { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+        -webkit-mask-image: linear-gradient(#000 calc(100% - 26px), transparent); mask-image: linear-gradient(#000 calc(100% - 26px), transparent); }
+      .body.split .side-col .feed::-webkit-scrollbar { display: none; }
     }
     @container gh-now (max-width: 699px) {
       .body.split .side-col { padding-top: 18px; border-top: 1px solid var(--gh-border); }
