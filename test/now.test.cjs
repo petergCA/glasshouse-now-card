@@ -395,6 +395,8 @@ const rule = (r) => H.normRule(r, 0);
     throws(() => c.setConfig({ activity: { entities: [] } }), /at least one entity/, 'empty activity rejected');
     c.setConfig({ activity: { entities: ['lock.a'], visible: 6, hours: 6 } });
     eq([c._config.activity.visible, c._config.activity.max, c._config.activity.hours], [6, 100, 6], 'activity.visible keeps up to 100 events');
+    c.setConfig({ activity: { entities: ['lock.a'], show_time: true } });
+    eq(c._config.activity.showTime, true, 'activity.show_time parsed');
     c.setConfig({ activity: { entities: ['lock.a'] } });
     eq([c._config.activity.visible, c._config.activity.max], [null, 8], 'activity defaults unchanged');
     c.setConfig({ attention: [] });

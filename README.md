@@ -149,6 +149,7 @@ remains.
 | `entities` | list | **required** | Entity ids, or objects `{entity, name, icon, states: [...]}`; `states` limits which changes are shown. |
 | `max` | number | `8` (`100` with `visible`) | Most events kept. |
 | `hours` | number | `12` | How far back to look. |
+| `show_time` | boolean | `false` | Show each event's clock time (no date), with the relative age under it. |
 | `visible` | number | – | Rows visible at once. The feed keeps that height and scrolls through every event in `hours` (fading at the bottom while more is below). Ignored in the wide split layout, which already fills its column and scrolls. |
 
 Changes to `unavailable` / `unknown` are skipped. Doors, windows, garage doors and covers read as
