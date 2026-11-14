@@ -6,7 +6,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.6.2';
+  const VERSION = '1.6.3';
   const TAG = 'glasshouse-now-card';
 
   const TICK_MS = 30000;
@@ -1089,8 +1089,8 @@
         window: ['mdi:window-open-variant', 'mdi:window-closed-variant'], shutter: ['mdi:window-shutter-open', 'mdi:window-shutter'],
         opening: ['mdi:square-rounded-outline', 'mdi:square-rounded'],
       }[kind];
-      // doors and garage doors read like locks: closed = secure (green), open = needs a look (yellow)
-      const secure = kind === 'garage' || kind === 'door' || kind === 'gate';
+      // doors, gates, windows and garage doors read like locks: closed = secure (green), open = needs a look (yellow)
+      const secure = kind === 'garage' || kind === 'door' || kind === 'gate' || kind === 'window';
       const tone = open || s === 'opening' ? (secure ? 'warn' : 'cover') : closed && secure ? 'ok' : 'neutral';
       return out(verb, { icon: open || s === 'opening' ? icons[0] : icons[1] }, tone);
     }
