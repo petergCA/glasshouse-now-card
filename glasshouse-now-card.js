@@ -1,12 +1,12 @@
 /*!
- * Glasshouse Now Card v1.4.1
+ * Glasshouse Now Card v1.4.2
  * What matters in the home right now: what needs you, what is running, and what just happened.
  * Part of the Glasshouse card suite. MIT License (c) 2026 Peter Gray.
  */
 (() => {
   'use strict';
 
-  const VERSION = '1.4.1';
+  const VERSION = '1.4.2';
   const TAG = 'glasshouse-now-card';
 
   const TICK_MS = 30000;
@@ -359,10 +359,10 @@
     .ev .et { flex: 1 1 auto; min-width: 0; color: var(--gh-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .ev .et span { color: var(--gh-text-2); }
     .ev time { flex: 0 0 auto; color: var(--gh-text-3); font-size: 12px; font-variant-numeric: tabular-nums; }
-    /* activity.show_time: clock time with the relative age under it */
-    .ev time.two { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
-    .ev time.two .clk { color: var(--gh-text-2); font-weight: 600; }
-    .ev time.two .ago { font-size: 11px; }
+    /* activity.show_time: clock time, then the relative age, each in a fixed right-aligned column so rows line up */
+    .ev time.two { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+    .ev time.two .clk { min-width: 4.9em; text-align: right; color: var(--gh-text-2); font-weight: 600; }
+    .ev time.two .ago { min-width: 5.4em; text-align: right; }
     .ev.fresh .dot { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 60%, transparent), 0 0 16px -4px var(--tone); }
     .ev.fresh time { color: var(--gh-text-2); }
     .ev.old .et { color: var(--gh-text-2); }
